@@ -2,6 +2,8 @@
 name = "oracle-score"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.81"
+resolver = "3"
 
 exclude = ["contract.wasm", "hash.txt"]
 
@@ -12,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
-cosmwasm-std     = { version = "1.5.8", features = ["stargate"] }
+cosmwasm-std     = "1.5.8"
 cosmwasm-schema  = "1.5.8"
 cw-storage-plus  = "1.2.0"
 cw2              = "1.1.2"
