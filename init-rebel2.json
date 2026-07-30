@@ -1,0 +1,22 @@
+{
+  "attestor": "terra16kjtjez9ywzguvf4xceumfsspp7wf7mc5q5zr7",
+  "treasury": "terra1mr40prxar6cy56vkqwx5522trnnzszu9gwfa86",
+  "pool": "terra1mr40prxar6cy56vkqwx5522trnnzszu9gwfa86",
+  "half_life_days": 90,
+  "epoch_len_days": 7,
+  "max_delta": "100",
+  "actions": [
+    { "key": "question_priority",
+      "params": { "weight": "40", "tiers": [], "price": "200000000000", "pool_bps": 5000, "daily_limit": 0 } },
+    { "key": "question_basic",
+      "params": { "weight": "40", "tiers": [], "price": "50000000000", "pool_bps": 5000, "daily_limit": 0 } },
+    { "key": "chat",
+      "params": { "weight": "5", "tiers": [], "price": "5000000000", "pool_bps": 0, "daily_limit": 0 } },
+    { "key": "answer",
+      "params": { "weight": "0",
+        "tiers": [ { "up_to": 3, "weight": "40" }, { "up_to": 10, "weight": "10" } ],
+        "price": "0", "pool_bps": 0, "daily_limit": 3 } },
+    { "key": "upvote",
+      "params": { "weight": "20", "tiers": [], "price": "0", "pool_bps": 0, "daily_limit": 1 } }
+  ]
+}
