@@ -36,8 +36,8 @@ pub enum ContractError {
     #[error("Only uluna is accepted")]
     UnexpectedDenom {},
 
-    #[error("pool_bps must not exceed 10000")]
-    InvalidBps {},
+    #[error("pool_amount must not exceed price")]
+    PoolExceedsPrice {},
 
     #[error("half_life_days must be greater than zero")]
     InvalidHalfLife {},

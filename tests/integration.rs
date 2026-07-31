@@ -15,6 +15,8 @@ const DENOM: &str = "uluna";
 const FOREIGN: &str = "uusd";
 
 const QUESTION_PRICE: u128 = 200_000;
+/// The entry-backing leg. Fixed by the tariff, never touched by discounts.
+const QUESTION_POOL: u128 = 100_000;
 const CHAT_PRICE: u128 = 5_000;
 
 fn contract() -> Box<dyn Contract<Empty>> {
@@ -25,7 +27,7 @@ fn params(
     weight: u128,
     tiers: Vec<(u64, u128)>,
     price: u128,
-    pool_bps: u16,
+    pool_amount: u128,
     daily_limit: u8,
 ) -> ActionParams {
     ActionParams {
@@ -38,7 +40,7 @@ fn params(
             })
             .collect(),
         price: Uint128::new(price),
-        pool_bps,
+        pool_amount: Uint128::new(pool_amount),
         daily_limit,
     }
 }
@@ -74,7 +76,7 @@ fn setup() -> (App, Addr) {
                     // Paid, split evenly between the weekly pool and treasury.
                     ActionItem {
                         key: "question".to_string(),
-                        params: params(40, vec![], QUESTION_PRICE, 5_000, 0),
+                        params: params(40, vec![], QUESTION_PRICE, QUESTION_POOL, 0),
                     },
                     // Paid, entirely to treasury.
                     ActionItem {
@@ -167,8 +169,10 @@ fn payment_splits_between_pool_and_treasury() {
     assert_eq!(balance(&app, c.as_str()), Uint128::zero());
 }
 
+/// The pool leg is fixed by the tariff, so anything extra is treasury income
+/// rather than an accidental over-backing of draw entries.
 #[test]
-fn overpayment_is_split_on_the_full_amount() {
+fn overpayment_goes_entirely_to_the_treasury() {
     let (mut app, c) = setup();
 
     pay(
@@ -181,13 +185,47 @@ fn overpayment_is_split_on_the_full_amount() {
     )
     .unwrap();
 
-    assert_eq!(balance(&app, POOL), Uint128::new(QUESTION_PRICE));
-    assert_eq!(balance(&app, TREASURY), Uint128::new(QUESTION_PRICE));
+    assert_eq!(balance(&app, POOL), Uint128::new(QUESTION_POOL));
+    assert_eq!(
+        balance(&app, TREASURY),
+        Uint128::new(QUESTION_PRICE * 2 - QUESTION_POOL)
+    );
+    assert_eq!(balance(&app, c.as_str()), Uint128::zero());
+}
+
+/// The reason the pool leg is an amount and not a percentage: a rank discount
+/// lowers what the user pays, and the draw entry behind it must stay fully
+/// backed anyway.
+#[test]
+fn discounted_payment_still_funds_the_pool_in_full() {
+    let (mut app, c) = setup();
+    let discounted = QUESTION_PRICE - 40_000;
+
+    app.execute_contract(
+        Addr::unchecked(ADMIN),
+        c.clone(),
+        &ExecuteMsg::SetAction {
+            item: ActionItem {
+                key: "question".to_string(),
+                params: params(40, vec![], discounted, QUESTION_POOL, 0),
+            },
+        },
+        &[],
+    )
+    .unwrap();
+
+    pay(&mut app, &c, USER, "question", "q1", &coins(discounted, DENOM)).unwrap();
+
+    assert_eq!(balance(&app, POOL), Uint128::new(QUESTION_POOL));
+    assert_eq!(
+        balance(&app, TREASURY),
+        Uint128::new(discounted - QUESTION_POOL)
+    );
     assert_eq!(balance(&app, c.as_str()), Uint128::zero());
 }
 
 #[test]
-fn zero_pool_bps_sends_everything_to_treasury() {
+fn zero_pool_amount_sends_everything_to_treasury() {
     let (mut app, c) = setup();
 
     pay(&mut app, &c, USER, "chat", "m1", &coins(CHAT_PRICE, DENOM)).unwrap();
@@ -389,7 +427,7 @@ fn random_wallet_cannot_record_actions() {
 }
 
 #[test]
-fn invalid_bps_is_rejected() {
+fn pool_amount_above_price_is_rejected() {
     let (mut app, c) = setup();
 
     let err = app
@@ -399,14 +437,14 @@ fn invalid_bps_is_rejected() {
             &ExecuteMsg::SetAction {
                 item: ActionItem {
                     key: "question".to_string(),
-                    params: params(40, vec![], QUESTION_PRICE, 10_001, 0),
+                    params: params(40, vec![], QUESTION_PRICE, QUESTION_PRICE + 1, 0),
                 },
             },
             &[],
         )
         .unwrap_err();
 
-    assert!(err.root_cause().to_string().contains("pool_bps"));
+    assert!(err.root_cause().to_string().contains("pool_amount"));
 }
 
 #[test]

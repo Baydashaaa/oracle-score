@@ -1,1 +1,1 @@
-b49c330c76232f3a178281c6f84e7905911eccf6da0ddfd19ee7a6433096f48d  oracle_score.wasm
+a8cfa71900ecf426fcb7cddbbaafdabaa17aae4c0a73f190db2f52df486cdf96  oracle_score.wasm

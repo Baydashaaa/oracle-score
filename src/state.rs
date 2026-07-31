@@ -36,8 +36,11 @@ pub struct ActionParams {
     /// Required payment in uluna. Zero means the action is free
     /// and can only be recorded by the attestor.
     pub price: Uint128,
-    /// Share of the payment routed to the pool address, in basis points.
-    pub pool_bps: u16,
+    /// Fixed amount routed to the pool address; whatever is left goes to the
+    /// treasury. Fixed rather than a percentage because rank discounts must
+    /// reduce only the treasury leg — the pool leg backs draw entries at a
+    /// protocol-wide rate and has to stay exact regardless of who is paying.
+    pub pool_amount: Uint128,
     /// Max occurrences per user per ref_id per day. Zero means unlimited.
     pub daily_limit: u8,
 }
@@ -148,7 +151,7 @@ mod tests {
                 },
             ],
             price: Uint128::zero(),
-            pool_bps: 0,
+            pool_amount: Uint128::zero(),
             daily_limit: 0,
         }
     }
@@ -240,7 +243,7 @@ mod tests {
             weight: Uint128::new(40),
             tiers: vec![],
             price: Uint128::zero(),
-            pool_bps: 0,
+            pool_amount: Uint128::zero(),
             daily_limit: 0,
         };
         assert_eq!(resolve_weight(&p, 0), Uint128::new(40));

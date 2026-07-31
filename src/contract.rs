@@ -15,11 +15,11 @@ const CONTRACT_NAME: &str = "crates.io:oracle-score";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DAY: u64 = 86_400;
 const DENOM: &str = "uluna";
-const BPS_DENOMINATOR: u128 = 10_000;
-
 fn validate_params(p: &ActionParams) -> Result<(), ContractError> {
-    if p.pool_bps as u128 > BPS_DENOMINATOR {
-        return Err(ContractError::InvalidBps {});
+    // A payment of exactly `price` must always cover the pool leg. Without this
+    // the cheapest valid payment would leave a draw entry partly unbacked.
+    if p.pool_amount > p.price {
+        return Err(ContractError::PoolExceedsPrice {});
     }
     Ok(())
 }
@@ -204,9 +204,10 @@ fn exec_paid_action(
     let weight = resolve_weight(&params, prior);
     let new_raw = accrue(deps.storage, &cfg, now, &info.sender, weight)?;
 
-    // pool_bps is validated at or below 10000, so the pool share never
-    // exceeds the payment and the subtraction below cannot underflow.
-    let to_pool = paid.multiply_ratio(params.pool_bps as u128, BPS_DENOMINATOR);
+    // validate_params guarantees pool_amount <= price and paid >= price was
+    // checked above, so this cannot underflow. Discounts and overpayment both
+    // land entirely on the treasury leg — the pool leg is fixed by the tariff.
+    let to_pool = params.pool_amount;
     let to_treasury = paid - to_pool;
 
     let mut msgs: Vec<BankMsg> = vec![];

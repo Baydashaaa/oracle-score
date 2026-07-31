@@ -12,8 +12,8 @@
         "weight": "40000000",
         "tiers": [],
         "price": "200000000000",
-        "pool_bps": 5000,
-        "daily_limit": 0
+        "daily_limit": 0,
+        "pool_amount": "100000000000"
       }
     },
     {
@@ -22,8 +22,8 @@
         "weight": "40000000",
         "tiers": [],
         "price": "50000000000",
-        "pool_bps": 5000,
-        "daily_limit": 0
+        "daily_limit": 0,
+        "pool_amount": "25000000000"
       }
     },
     {
@@ -32,8 +32,8 @@
         "weight": "5000000",
         "tiers": [],
         "price": "5000000000",
-        "pool_bps": 0,
-        "daily_limit": 0
+        "daily_limit": 0,
+        "pool_amount": "0"
       }
     },
     {
@@ -51,8 +51,8 @@
           }
         ],
         "price": "0",
-        "pool_bps": 0,
-        "daily_limit": 3
+        "daily_limit": 3,
+        "pool_amount": "0"
       }
     },
     {
@@ -61,8 +61,8 @@
         "weight": "20000000",
         "tiers": [],
         "price": "0",
-        "pool_bps": 0,
-        "daily_limit": 1
+        "daily_limit": 1,
+        "pool_amount": "0"
       }
     }
   ]
