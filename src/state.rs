@@ -56,7 +56,9 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const ACTIONS: Map<&str, ActionParams> = Map::new("actions");
 pub const SCORES: Map<&Addr, ScoreEntry> = Map::new("scores");
 pub const EPOCH_SCORES: Map<(u64, &Addr), Uint128> = Map::new("epoch_scores");
-pub const RATE_LIMIT: Map<(&Addr, &str, u64), u8> = Map::new("rate_limit");
+/// Keyed day-first so stale entries sort to the front and can be pruned
+/// with a bounded range scan instead of a full table walk.
+pub const RATE_LIMIT: Map<(u64, &Addr, &str), u8> = Map::new("rate_limit_v2");
 /// Occurrences per (action, ref_id). Drives the tiered weight schedule.
 pub const REF_COUNT: Map<(&str, &str), u64> = Map::new("ref_count");
 

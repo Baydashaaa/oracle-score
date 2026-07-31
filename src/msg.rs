@@ -50,6 +50,12 @@ pub enum ExecuteMsg {
         amount: Uint128,
         reason: String,
     },
+    /// Delete rate-limit counters for days before `before_day`. Paginated:
+    /// call repeatedly until the `removed` attribute comes back as zero.
+    PruneRateLimit {
+        before_day: u64,
+        limit: Option<u32>,
+    },
     SetAction { item: ActionItem },
     /// Adjust operational parameters without a migration. Epoch length is
     /// deliberately absent: changing it would reindex historical buckets.
@@ -98,6 +104,8 @@ pub struct ConfigResponse {
     pub half_life_secs: u64,
     pub epoch_len_secs: u64,
     pub current_epoch: u64,
+    /// Day index used by rate limits. Feed this to PruneRateLimit.
+    pub current_day: u64,
     pub seeding: bool,
     pub paused: bool,
 }

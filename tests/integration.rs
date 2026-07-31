@@ -712,3 +712,91 @@ fn zero_half_life_is_rejected() {
         .unwrap_err();
     assert!(err.root_cause().to_string().contains("half_life_days"));
 }
+
+// ---- rate-limit pruning ----
+
+fn attr_value(res: &cw_multi_test::AppResponse, key: &str) -> String {
+    res.events
+        .iter()
+        .flat_map(|e| e.attributes.iter())
+        .find(|a| a.key == key)
+        .map(|a| a.value.clone())
+        .unwrap_or_default()
+}
+
+fn current_day(app: &App, c: &Addr) -> u64 {
+    let cfg: ConfigResponse = app.wrap().query_wasm_smart(c, &QueryMsg::Config {}).unwrap();
+    cfg.current_day
+}
+
+fn prune(app: &mut App, c: &Addr, who: &str, before_day: u64, limit: Option<u32>) -> anyhow::Result<String> {
+    app.execute_contract(
+        Addr::unchecked(who),
+        c.clone(),
+        &ExecuteMsg::PruneRateLimit { before_day, limit },
+        &[],
+    )
+    .map(|r| attr_value(&r, "removed"))
+    .map_err(|e| anyhow::anyhow!(e.root_cause().to_string()))
+}
+
+/// Three days of activity, then prune everything before today.
+#[test]
+fn prune_clears_old_days_but_spares_today() {
+    let (mut app, c) = setup();
+
+    for _ in 0..3 {
+        for _ in 0..3 {
+            answer(&mut app, &c, USER, "q1").unwrap();
+        }
+        app.update_block(|b| b.time = b.time.plus_seconds(86_400));
+    }
+    for _ in 0..3 {
+        answer(&mut app, &c, USER, "q1").unwrap();
+    }
+
+    let today = current_day(&app, &c);
+    assert_eq!(prune(&mut app, &c, ADMIN, today, None).unwrap(), "3");
+
+    // Today's counter survived, so the fourth answer is still refused.
+    assert!(answer(&mut app, &c, USER, "q1")
+        .unwrap_err()
+        .to_string()
+        .contains("Daily limit"));
+
+    // Nothing left to clean.
+    assert_eq!(prune(&mut app, &c, ADMIN, today, None).unwrap(), "0");
+}
+
+#[test]
+fn prune_is_paginated() {
+    let (mut app, c) = setup();
+
+    for _ in 0..3 {
+        answer(&mut app, &c, USER, "q1").unwrap();
+        app.update_block(|b| b.time = b.time.plus_seconds(86_400));
+    }
+
+    let today = current_day(&app, &c);
+    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "1");
+    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "1");
+    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "1");
+    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "0");
+}
+
+#[test]
+fn prune_before_day_zero_is_a_no_op() {
+    let (mut app, c) = setup();
+    answer(&mut app, &c, USER, "q1").unwrap();
+    assert_eq!(prune(&mut app, &c, ADMIN, 0, None).unwrap(), "0");
+}
+
+#[test]
+fn only_admin_can_prune() {
+    let (mut app, c) = setup();
+    answer(&mut app, &c, USER, "q1").unwrap();
+
+    let today = current_day(&app, &c);
+    let err = prune(&mut app, &c, OTHER, today, None).unwrap_err();
+    assert!(err.to_string().contains("Unauthorized"));
+}

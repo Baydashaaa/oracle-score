@@ -83,6 +83,9 @@ pub fn execute(
             amount,
             reason,
         } => exec_slash(deps, env, info, user, amount, reason),
+        ExecuteMsg::PruneRateLimit { before_day, limit } => {
+            exec_prune_rate_limit(deps, info, before_day, limit)
+        }
         ExecuteMsg::SetAction { item } => exec_set_action(deps, info, item),
         ExecuteMsg::UpdateConfig {
             attestor,
@@ -138,7 +141,7 @@ fn check_rate_limit(
         return Ok(());
     }
     let day = now / DAY;
-    let key = (user, ref_id, day);
+    let key = (day, user, ref_id);
     let used = RATE_LIMIT.may_load(storage, key)?.unwrap_or(0);
     if used >= limit {
         return Err(ContractError::RateLimited {});
@@ -356,6 +359,38 @@ fn exec_slash(
         .add_attribute("raw", e.raw.to_string()))
 }
 
+fn exec_prune_rate_limit(
+    deps: DepsMut,
+    info: MessageInfo,
+    before_day: u64,
+    limit: Option<u32>,
+) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if info.sender != cfg.admin {
+        return Err(ContractError::Unauthorized {});
+    }
+    let limit = limit.unwrap_or(200).min(1000) as usize;
+
+    // Keys are ordered day-first, so the oldest sit at the front and
+    // take_while stops the moment we reach the cutoff.
+    let stale: Vec<(u64, Addr, String)> = RATE_LIMIT
+        .keys(deps.storage, None, None, Order::Ascending)
+        .take(limit)
+        .collect::<StdResult<Vec<_>>>()?
+        .into_iter()
+        .take_while(|(d, _, _)| *d < before_day)
+        .collect();
+
+    let removed = stale.len();
+    for (d, addr, ref_id) in stale {
+        RATE_LIMIT.remove(deps.storage, (d, &addr, ref_id.as_str()));
+    }
+
+    Ok(Response::new()
+        .add_attribute("action", "prune_rate_limit")
+        .add_attribute("removed", removed.to_string()))
+}
+
 fn exec_set_action(
     deps: DepsMut,
     info: MessageInfo,
@@ -471,6 +506,7 @@ fn q_config(deps: Deps, env: Env) -> StdResult<ConfigResponse> {
         half_life_secs: cfg.half_life_secs,
         epoch_len_secs: cfg.epoch_len_secs,
         current_epoch: epoch_of(&cfg, env.block.time.seconds()),
+        current_day: env.block.time.seconds() / DAY,
         seeding: cfg.seeding,
         paused: cfg.paused,
     })
