@@ -2,7 +2,7 @@
 set -euo pipefail
 
 KEY=oracle-dev
-ADMIN=terra1mr40prxar6cy56vkqwx5522trnnzszu9gwfa86
+ADMIN=terra1ufn6575ta92xmgzrllpf5cguycwd4kyyf5uetw
 GAS="--gas auto --gas-adjustment 1.6 --gas-prices 28.325uluna -y"
 EXPECTED=a6fb6a101a4465e38cd0cebe89d9146e4937f0637a4550732dbaed35cd92b18e
 

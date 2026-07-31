@@ -1,7 +1,7 @@
 {
   "attestor": "terra16kjtjez9ywzguvf4xceumfsspp7wf7mc5q5zr7",
-  "treasury": "terra1mr40prxar6cy56vkqwx5522trnnzszu9gwfa86",
-  "pool": "terra1mr40prxar6cy56vkqwx5522trnnzszu9gwfa86",
+  "treasury": "terra1ufn6575ta92xmgzrllpf5cguycwd4kyyf5uetw",
+  "pool": "terra1ufn6575ta92xmgzrllpf5cguycwd4kyyf5uetw",
   "half_life_days": 90,
   "epoch_len_days": 7,
   "max_delta": "100",
