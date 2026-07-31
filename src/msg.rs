@@ -89,10 +89,10 @@ pub enum QueryMsg {
         start_after: Option<String>,
         limit: Option<u32>,
     },
-    /// How many times an action has been recorded against a ref_id.
-    /// Lets the frontend show the next available weight before acting.
-    #[returns(RefCountResponse)]
-    RefCount { action: String, ref_id: String },
+    /// How many times a user has performed an action today.
+    /// Lets the frontend show what the next one is worth before acting.
+    #[returns(TierCountResponse)]
+    TierCount { action: String, address: String },
 }
 
 #[cw_serde]
@@ -126,7 +126,8 @@ pub struct EpochScoreResponse {
 }
 
 #[cw_serde]
-pub struct RefCountResponse {
+pub struct TierCountResponse {
+    /// Occurrences by this user for this action so far today.
     pub count: u64,
     /// Weight the next occurrence would earn.
     pub next_weight: Uint128,

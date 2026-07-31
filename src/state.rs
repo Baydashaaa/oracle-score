@@ -59,8 +59,11 @@ pub const EPOCH_SCORES: Map<(u64, &Addr), Uint128> = Map::new("epoch_scores");
 /// Keyed day-first so stale entries sort to the front and can be pruned
 /// with a bounded range scan instead of a full table walk.
 pub const RATE_LIMIT: Map<(u64, &Addr, &str), u8> = Map::new("rate_limit_v2");
-/// Occurrences per (action, ref_id). Drives the tiered weight schedule.
-pub const REF_COUNT: Map<(&str, &str), u64> = Map::new("ref_count");
+/// Occurrences per (UTC day, action, user). Drives the tiered weight schedule:
+/// the ladder caps how much one person earns per day across all references,
+/// so a popular question never penalises whoever answers it late.
+/// Day-first for the same reason as RATE_LIMIT — stale rows prune cheaply.
+pub const TIER_COUNT: Map<(u64, &str, &Addr), u64> = Map::new("tier_count");
 
 /// Weight for the next occurrence, given how many came before it.
 pub fn resolve_weight(params: &ActionParams, prior_count: u64) -> Uint128 {

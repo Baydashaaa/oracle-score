@@ -234,21 +234,27 @@ fn underpayment_is_rejected() {
     assert_eq!(balance(&app, TREASURY), Uint128::zero());
 }
 
+/// The ladder limits how much one person earns per day, so it must not
+/// punish whoever answers a popular question late.
 #[test]
-fn answer_weight_steps_down_across_users_on_the_same_question() {
+fn answer_ladder_is_per_user_per_day_not_per_question() {
     let (mut app, c) = setup();
 
-    // The counter is per question, not per user, so the fourth answer
-    // is worth less even though a different person wrote it.
-    for _ in 0..3 {
-        answer(&mut app, &c, USER, "q1").unwrap();
+    // Four different questions today: 40, 40, 40, then the drop to 10.
+    for i in 0..4 {
+        answer(&mut app, &c, USER, &format!("q{}", i)).unwrap();
     }
-    for _ in 0..3 {
-        answer(&mut app, &c, OTHER, "q1").unwrap();
-    }
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(130));
 
-    assert_eq!(score_of(&app, &c, USER), Uint128::new(120));
-    assert_eq!(score_of(&app, &c, OTHER), Uint128::new(30));
+    // A second wallet answering the same busy question still earns full
+    // weight — someone else's activity never dilutes it.
+    answer(&mut app, &c, OTHER, "q0").unwrap();
+    assert_eq!(score_of(&app, &c, OTHER), Uint128::new(40));
+
+    // The ladder resets at the day boundary: 130 ages to 129, then +40.
+    app.update_block(|b| b.time = b.time.plus_seconds(86_400));
+    answer(&mut app, &c, USER, "q0").unwrap();
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(169));
 }
 
 #[test]
@@ -261,50 +267,83 @@ fn daily_limit_blocks_the_fourth_answer_from_one_user() {
     let err = answer(&mut app, &c, USER, "q1").unwrap_err();
     assert!(err.to_string().contains("Daily limit"));
 
-    // A different question is unaffected and starts at the top tier.
+    // A different question is allowed, but it is still this wallet's fourth
+    // answer today, so the ladder has already dropped it to 10.
     answer(&mut app, &c, USER, "q2").unwrap();
-    assert_eq!(score_of(&app, &c, USER), Uint128::new(160));
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(130));
 
-    // Next day the limit lifts, but q1 has moved down a tier.
-    // The existing 160 ages one day first: 160 * 15465600/15552000 = 159, then +10.
+    // Next day both the per-question limit and the ladder reset.
+    // The existing 130 ages one day first: 130 * 15465600/15552000 = 129, then +40.
     app.update_block(|b| b.time = b.time.plus_seconds(86_400));
     answer(&mut app, &c, USER, "q1").unwrap();
     assert_eq!(score_of(&app, &c, USER), Uint128::new(169));
 }
 
-#[test]
-fn ref_count_query_reports_the_next_weight() {
-    let (mut app, c) = setup();
-
-    let fresh: RefCountResponse = app
-        .wrap()
+fn tier_count(app: &App, c: &Addr, who: &str) -> TierCountResponse {
+    app.wrap()
         .query_wasm_smart(
-            &c,
-            &QueryMsg::RefCount {
+            c,
+            &QueryMsg::TierCount {
                 action: "answer".to_string(),
-                ref_id: "q1".to_string(),
+                address: who.to_string(),
             },
         )
-        .unwrap();
+        .unwrap()
+}
+
+#[test]
+fn tier_count_query_reports_the_next_weight() {
+    let (mut app, c) = setup();
+
+    let fresh = tier_count(&app, &c, USER);
     assert_eq!(fresh.count, 0);
     assert_eq!(fresh.next_weight, Uint128::new(40));
 
-    for _ in 0..3 {
-        answer(&mut app, &c, USER, "q1").unwrap();
+    for i in 0..3 {
+        answer(&mut app, &c, USER, &format!("q{}", i)).unwrap();
     }
 
-    let after: RefCountResponse = app
-        .wrap()
-        .query_wasm_smart(
-            &c,
-            &QueryMsg::RefCount {
-                action: "answer".to_string(),
-                ref_id: "q1".to_string(),
-            },
-        )
-        .unwrap();
+    let after = tier_count(&app, &c, USER);
     assert_eq!(after.count, 3);
     assert_eq!(after.next_weight, Uint128::new(10));
+
+    // Per wallet, so another user still starts at the top of the ladder.
+    assert_eq!(tier_count(&app, &c, OTHER).next_weight, Uint128::new(40));
+}
+
+/// Rank reads lifetime_earned, so a slash has to cut it too — otherwise an
+/// abuser loses voting weight but keeps their rank and fee discount.
+#[test]
+fn slash_cuts_rank_as_well_as_weight() {
+    let (mut app, c) = setup();
+
+    ask(&mut app, &c, USER, "q1").unwrap();
+    ask(&mut app, &c, USER, "q2").unwrap();
+
+    let before: ScoreResponse = app
+        .wrap()
+        .query_wasm_smart(&c, &QueryMsg::Score { address: USER.to_string() })
+        .unwrap();
+    assert_eq!(before.lifetime_earned, Uint128::new(80));
+
+    app.execute_contract(
+        Addr::unchecked(ADMIN),
+        c.clone(),
+        &ExecuteMsg::Slash {
+            user: USER.to_string(),
+            amount: Uint128::new(50),
+            reason: "farming".to_string(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    let after: ScoreResponse = app
+        .wrap()
+        .query_wasm_smart(&c, &QueryMsg::Score { address: USER.to_string() })
+        .unwrap();
+    assert_eq!(after.effective, Uint128::new(30));
+    assert_eq!(after.lifetime_earned, Uint128::new(30));
 }
 
 #[test]
@@ -755,8 +794,9 @@ fn prune_clears_old_days_but_spares_today() {
         answer(&mut app, &c, USER, "q1").unwrap();
     }
 
+    // Three stale days in RATE_LIMIT plus three in TIER_COUNT.
     let today = current_day(&app, &c);
-    assert_eq!(prune(&mut app, &c, ADMIN, today, None).unwrap(), "3");
+    assert_eq!(prune(&mut app, &c, ADMIN, today, None).unwrap(), "6");
 
     // Today's counter survived, so the fourth answer is still refused.
     assert!(answer(&mut app, &c, USER, "q1")
@@ -777,10 +817,11 @@ fn prune_is_paginated() {
         app.update_block(|b| b.time = b.time.plus_seconds(86_400));
     }
 
+    // The limit applies per map, so each pass removes one row from each.
     let today = current_day(&app, &c);
-    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "1");
-    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "1");
-    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "1");
+    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "2");
+    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "2");
+    assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "2");
     assert_eq!(prune(&mut app, &c, ADMIN, today, Some(1)).unwrap(), "0");
 }
 

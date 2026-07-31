@@ -150,15 +150,17 @@ fn check_rate_limit(
     Ok(())
 }
 
-/// Returns the count of prior occurrences, then records this one.
-fn bump_ref_count(
+/// Returns how many times this user already did this action today,
+/// then records the current one.
+fn bump_tier_count(
     storage: &mut dyn Storage,
+    now: u64,
     action: &str,
-    ref_id: &str,
+    user: &Addr,
 ) -> StdResult<u64> {
-    let key = (action, ref_id);
-    let prior = REF_COUNT.may_load(storage, key)?.unwrap_or(0);
-    REF_COUNT.save(storage, key, &(prior + 1))?;
+    let key = (now / DAY, action, user);
+    let prior = TIER_COUNT.may_load(storage, key)?.unwrap_or(0);
+    TIER_COUNT.save(storage, key, &(prior + 1))?;
     Ok(prior)
 }
 
@@ -198,7 +200,7 @@ fn exec_paid_action(
 
     let now = env.block.time.seconds();
     check_rate_limit(deps.storage, now, &info.sender, &ref_id, params.daily_limit)?;
-    let prior = bump_ref_count(deps.storage, &action, &ref_id)?;
+    let prior = bump_tier_count(deps.storage, now, &action, &info.sender)?;
     let weight = resolve_weight(&params, prior);
     let new_raw = accrue(deps.storage, &cfg, now, &info.sender, weight)?;
 
@@ -263,7 +265,7 @@ fn exec_record_action(
     let user_addr = deps.api.addr_validate(&user)?;
     let now = env.block.time.seconds();
     check_rate_limit(deps.storage, now, &user_addr, &ref_id, params.daily_limit)?;
-    let prior = bump_ref_count(deps.storage, &action, &ref_id)?;
+    let prior = bump_tier_count(deps.storage, now, &action, &user_addr)?;
     let weight = resolve_weight(&params, prior);
 
     if weight > cfg.max_delta {
@@ -348,6 +350,9 @@ fn exec_slash(
     let dt = now.saturating_sub(e.last_update);
     let current = decay(e.raw, dt, cfg.half_life_secs);
     e.raw = current.saturating_sub(amount);
+    // Rank reads lifetime_earned, so slashing only the decaying figure would
+    // strip an abuser's weight while leaving their rank and fee discount intact.
+    e.lifetime_earned = e.lifetime_earned.saturating_sub(amount);
     e.last_update = now;
     SCORES.save(deps.storage, &addr, &e)?;
 
@@ -381,9 +386,22 @@ fn exec_prune_rate_limit(
         .take_while(|(d, _, _)| *d < before_day)
         .collect();
 
-    let removed = stale.len();
+    let mut removed = stale.len();
     for (d, addr, ref_id) in stale {
         RATE_LIMIT.remove(deps.storage, (d, &addr, ref_id.as_str()));
+    }
+
+    let stale_tiers: Vec<(u64, String, Addr)> = TIER_COUNT
+        .keys(deps.storage, None, None, Order::Ascending)
+        .take(limit)
+        .collect::<StdResult<Vec<_>>>()?
+        .into_iter()
+        .take_while(|(d, _, _)| *d < before_day)
+        .collect();
+
+    removed += stale_tiers.len();
+    for (d, action, addr) in stale_tiers {
+        TIER_COUNT.remove(deps.storage, (d, action.as_str(), &addr));
     }
 
     Ok(Response::new()
@@ -490,8 +508,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
         } => to_json_binary(&q_leaderboard(deps, env, epoch, start_after, limit)?),
-        QueryMsg::RefCount { action, ref_id } => {
-            to_json_binary(&q_ref_count(deps, action, ref_id)?)
+        QueryMsg::TierCount { action, address } => {
+            to_json_binary(&q_tier_count(deps, env, action, address)?)
         }
     }
 }
@@ -551,15 +569,22 @@ fn q_epoch_score(
     Ok(EpochScoreResponse { epoch: ep, score })
 }
 
-fn q_ref_count(deps: Deps, action: String, ref_id: String) -> StdResult<RefCountResponse> {
-    let count = REF_COUNT
-        .may_load(deps.storage, (action.as_str(), ref_id.as_str()))?
+fn q_tier_count(
+    deps: Deps,
+    env: Env,
+    action: String,
+    address: String,
+) -> StdResult<TierCountResponse> {
+    let addr = deps.api.addr_validate(&address)?;
+    let day = env.block.time.seconds() / DAY;
+    let count = TIER_COUNT
+        .may_load(deps.storage, (day, action.as_str(), &addr))?
         .unwrap_or(0);
     let next_weight = match ACTIONS.may_load(deps.storage, action.as_str())? {
         Some(p) => resolve_weight(&p, count),
         None => Uint128::zero(),
     };
-    Ok(RefCountResponse { count, next_weight })
+    Ok(TierCountResponse { count, next_weight })
 }
 
 fn q_leaderboard(
