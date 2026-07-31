@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/30607662/README.md)
 # Oracle Score
 
 On-chain reputation for [Terra Oracle Classic](https://terraoracle.io), running as a
