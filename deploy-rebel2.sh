@@ -33,11 +33,11 @@ echo "    code_id: $code_id"
 echo "==> verify hash"
 terrad q wasm code-info "$code_id" | python3 -c "
 import json,sys,base64
-d=json.load(sys.stdin); v=d['data_hash']
+d=json.load(sys.stdin); v=d.get('checksum') or d['data_hash']
 on = base64.b64decode(v).hex() if len(v)==44 else v.lower()
 print('    on-chain:', on)
 print('    local:   ', '$EXPECTED')
-sys.exit(0 if on=='$EXPECTED' else 'HASH MISMATCH')
+sys.exit(0 if on.lower()=='$EXPECTED'.lower() else 'HASH MISMATCH')
 "
 
 echo "==> instantiate"
