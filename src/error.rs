@@ -38,4 +38,7 @@ pub enum ContractError {
 
     #[error("pool_bps must not exceed 10000")]
     InvalidBps {},
+
+    #[error("half_life_days must be greater than zero")]
+    InvalidHalfLife {},
 }

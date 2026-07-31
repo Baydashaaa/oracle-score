@@ -51,7 +51,15 @@ pub enum ExecuteMsg {
         reason: String,
     },
     SetAction { item: ActionItem },
-    SetAttestor { attestor: String },
+    /// Adjust operational parameters without a migration. Epoch length is
+    /// deliberately absent: changing it would reindex historical buckets.
+    UpdateConfig {
+        attestor: Option<String>,
+        treasury: Option<String>,
+        pool: Option<String>,
+        max_delta: Option<Uint128>,
+        half_life_days: Option<u64>,
+    },
     SetAdmin { admin: String },
     SetPaused { paused: bool },
 }

@@ -582,3 +582,133 @@ fn slash_reduces_score_and_only_admin_can_do_it() {
     .unwrap();
     assert_eq!(score_of(&app, &c, USER), Uint128::zero());
 }
+
+// ---- precision regression, found on rebel-2 ----
+
+const SCALE: u128 = 1_000_000;
+
+fn setup_with(answer_weight: u128, max_delta: u128) -> (App, Addr) {
+    let mut app = AppBuilder::new().build(|router, _, storage| {
+        router
+            .bank
+            .init_balance(storage, &Addr::unchecked(USER), coins(10_000_000, DENOM))
+            .unwrap();
+    });
+    let code_id = app.store_code(contract());
+    let addr = app
+        .instantiate_contract(
+            code_id,
+            Addr::unchecked(ADMIN),
+            &InstantiateMsg {
+                admin: None,
+                attestor: ATTESTOR.to_string(),
+                treasury: TREASURY.to_string(),
+                pool: POOL.to_string(),
+                half_life_days: 90,
+                epoch_len_days: 7,
+                max_delta: Uint128::new(max_delta),
+                actions: vec![ActionItem {
+                    key: "answer".to_string(),
+                    params: params(answer_weight, vec![], 0, 0, 0),
+                }],
+            },
+            &[],
+            "oracle-score-precision",
+            Some(ADMIN.to_string()),
+        )
+        .unwrap();
+    (app, addr)
+}
+
+fn answer_ref(app: &mut App, c: &Addr, ref_id: &str) {
+    app.execute_contract(
+        Addr::unchecked(ATTESTOR),
+        c.clone(),
+        &ExecuteMsg::RecordAction {
+            user: USER.to_string(),
+            action: "answer".to_string(),
+            ref_id: ref_id.to_string(),
+        },
+        &[],
+    )
+    .unwrap();
+}
+
+/// Four grants of 40, fifteen seconds apart, exactly like real blocks.
+/// Integer division floors away almost a full point on every write.
+#[test]
+fn unscaled_weights_leak_a_point_per_action() {
+    let (mut app, c) = setup_with(40, 100);
+    for i in 0..4 {
+        answer_ref(&mut app, &c, &format!("q{}", i));
+        app.update_block(|b| b.time = b.time.plus_seconds(15));
+    }
+    let earned = Uint128::new(160);
+    let actual = score_of(&app, &c, USER);
+    assert!(
+        earned - actual >= Uint128::new(4),
+        "expected visible loss, got {} of {}",
+        actual,
+        earned
+    );
+}
+
+/// The same run in micro-units: the floor costs parts per million.
+#[test]
+fn scaled_weights_keep_the_loss_negligible() {
+    let (mut app, c) = setup_with(40 * SCALE, 100 * SCALE);
+    for i in 0..4 {
+        answer_ref(&mut app, &c, &format!("q{}", i));
+        app.update_block(|b| b.time = b.time.plus_seconds(15));
+    }
+    let earned = Uint128::new(160 * SCALE);
+    let lost = earned - score_of(&app, &c, USER);
+    assert!(lost < Uint128::new(1_000), "lost {} of {}", lost, earned);
+}
+
+#[test]
+fn only_admin_can_update_config() {
+    let (mut app, c) = setup_with(40 * SCALE, 100 * SCALE);
+
+    let msg = ExecuteMsg::UpdateConfig {
+        attestor: None,
+        treasury: None,
+        pool: None,
+        max_delta: Some(Uint128::new(999 * SCALE)),
+        half_life_days: Some(30),
+    };
+
+    let err = app
+        .execute_contract(Addr::unchecked(OTHER), c.clone(), &msg, &[])
+        .unwrap_err();
+    assert!(err.root_cause().to_string().contains("Unauthorized"));
+
+    app.execute_contract(Addr::unchecked(ADMIN), c.clone(), &msg, &[])
+        .unwrap();
+
+    let cfg: ConfigResponse = app
+        .wrap()
+        .query_wasm_smart(&c, &QueryMsg::Config {})
+        .unwrap();
+    assert_eq!(cfg.half_life_secs, 30 * 86_400);
+}
+
+#[test]
+fn zero_half_life_is_rejected() {
+    let (mut app, c) = setup_with(40 * SCALE, 100 * SCALE);
+    let err = app
+        .execute_contract(
+            Addr::unchecked(ADMIN),
+            c.clone(),
+            &ExecuteMsg::UpdateConfig {
+                attestor: None,
+                treasury: None,
+                pool: None,
+                max_delta: None,
+                half_life_days: Some(0),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert!(err.root_cause().to_string().contains("half_life_days"));
+}

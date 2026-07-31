@@ -84,7 +84,13 @@ pub fn execute(
             reason,
         } => exec_slash(deps, env, info, user, amount, reason),
         ExecuteMsg::SetAction { item } => exec_set_action(deps, info, item),
-        ExecuteMsg::SetAttestor { attestor } => exec_set_attestor(deps, info, attestor),
+        ExecuteMsg::UpdateConfig {
+            attestor,
+            treasury,
+            pool,
+            max_delta,
+            half_life_days,
+        } => exec_update_config(deps, info, attestor, treasury, pool, max_delta, half_life_days),
         ExecuteMsg::SetAdmin { admin } => exec_set_admin(deps, info, admin),
         ExecuteMsg::SetPaused { paused } => exec_set_paused(deps, info, paused),
     }
@@ -366,20 +372,42 @@ fn exec_set_action(
         .add_attribute("key", item.key))
 }
 
-fn exec_set_attestor(
+#[allow(clippy::too_many_arguments)]
+fn exec_update_config(
     deps: DepsMut,
     info: MessageInfo,
-    attestor: String,
+    attestor: Option<String>,
+    treasury: Option<String>,
+    pool: Option<String>,
+    max_delta: Option<Uint128>,
+    half_life_days: Option<u64>,
 ) -> Result<Response, ContractError> {
     let mut cfg = CONFIG.load(deps.storage)?;
     if info.sender != cfg.admin {
         return Err(ContractError::Unauthorized {});
     }
-    cfg.attestor = deps.api.addr_validate(&attestor)?;
+    if let Some(a) = attestor {
+        cfg.attestor = deps.api.addr_validate(&a)?;
+    }
+    if let Some(a) = treasury {
+        cfg.treasury = deps.api.addr_validate(&a)?;
+    }
+    if let Some(a) = pool {
+        cfg.pool = deps.api.addr_validate(&a)?;
+    }
+    if let Some(m) = max_delta {
+        cfg.max_delta = m;
+    }
+    if let Some(d) = half_life_days {
+        if d == 0 {
+            return Err(ContractError::InvalidHalfLife {});
+        }
+        // Stored balances were last decayed under the previous rate; the new
+        // rate applies to the whole span since each account's last_update.
+        cfg.half_life_secs = d * DAY;
+    }
     CONFIG.save(deps.storage, &cfg)?;
-    Ok(Response::new()
-        .add_attribute("action", "set_attestor")
-        .add_attribute("attestor", attestor))
+    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 fn exec_set_admin(
