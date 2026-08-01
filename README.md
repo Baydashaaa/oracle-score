@@ -16,8 +16,8 @@ executed by the chain, and anyone can verify them.
 | Mainnet | `columbus-5` | `terra1pj6t6v4czktz7znzq8xk2ny2yh7pdwen4jw8z4zz86zrac6ur9vqqkwcls` |
 | Testnet | `rebel-2` | `terra1vc92p8nawzfl4q87rhpxazm22d6fjrt884ajt9k95ypdfwg9l2aq9fkwlx` |
 
-Mainnet code id `11551`, checksum
-`a8cfa71900ecf426fcb7cddbbaafdabaa17aae4c0a73f190db2f52df486cdf96`.
+Mainnet code id `11552`, checksum
+`99c6cd4e79ea7e0adc3c9c9f301fdfac450a64f49b9236f543e0c2e64421f9ff`.
 
 Reputation was seeded from a snapshot whose canonical hash is
 `4aed25763e120f627a3403604c66b20145002ea642487a57bc43d9fe42df4520` - 4 wallets,
@@ -141,7 +141,7 @@ cat artifacts/checksums.txt
 Compare against the chain:
 
 ```bash
-curl -s https://terra-classic-lcd.publicnode.com/cosmwasm/wasm/v1/code/11551
+curl -s https://terra-classic-lcd.publicnode.com/cosmwasm/wasm/v1/code/11552
 ```
 
 Building locally with a modern toolchain instead of the optimizer produces a
