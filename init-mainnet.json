@@ -7,21 +7,69 @@
   "epoch_len_days": 7,
   "max_delta": "100000000",
   "actions": [
-    { "key": "question_priority",
-      "params": { "weight": "40000000", "tiers": [],
-        "price": "150000000000", "pool_amount": "100000000000", "daily_limit": 0 } },
-    { "key": "question_basic",
-      "params": { "weight": "40000000", "tiers": [],
-        "price": "37500000000", "pool_amount": "25000000000", "daily_limit": 0 } },
-    { "key": "chat",
-      "params": { "weight": "5000000", "tiers": [],
-        "price": "5000000000", "pool_amount": "0", "daily_limit": 0 } },
-    { "key": "answer",
-      "params": { "weight": "0",
-        "tiers": [ { "up_to": 3, "weight": "40000000" }, { "up_to": 10, "weight": "10000000" } ],
-        "price": "0", "pool_amount": "0", "daily_limit": 3 } },
-    { "key": "upvote",
-      "params": { "weight": "20000000", "tiers": [],
-        "price": "0", "pool_amount": "0", "daily_limit": 1 } }
+    {
+      "key": "question_priority",
+      "params": {
+        "weight": "40000000",
+        "tiers": [],
+        "price": "150000000000",
+        "pool_amount": "100000000000",
+        "daily_limit": 0,
+        "attestor_may_record": true
+      }
+    },
+    {
+      "key": "question_basic",
+      "params": {
+        "weight": "40000000",
+        "tiers": [],
+        "price": "37500000000",
+        "pool_amount": "25000000000",
+        "daily_limit": 0,
+        "attestor_may_record": true
+      }
+    },
+    {
+      "key": "chat",
+      "params": {
+        "weight": "5000000",
+        "tiers": [],
+        "price": "5000000000",
+        "pool_amount": "0",
+        "daily_limit": 0,
+        "attestor_may_record": true
+      }
+    },
+    {
+      "key": "answer",
+      "params": {
+        "weight": "0",
+        "tiers": [
+          {
+            "up_to": 3,
+            "weight": "40000000"
+          },
+          {
+            "up_to": 10,
+            "weight": "10000000"
+          }
+        ],
+        "price": "0",
+        "pool_amount": "0",
+        "daily_limit": 3,
+        "attestor_may_record": false
+      }
+    },
+    {
+      "key": "upvote",
+      "params": {
+        "weight": "20000000",
+        "tiers": [],
+        "price": "0",
+        "pool_amount": "0",
+        "daily_limit": 1,
+        "attestor_may_record": false
+      }
+    }
   ]
 }

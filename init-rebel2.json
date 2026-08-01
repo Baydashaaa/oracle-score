@@ -13,7 +13,8 @@
         "tiers": [],
         "price": "200000000000",
         "daily_limit": 0,
-        "pool_amount": "100000000000"
+        "pool_amount": "100000000000",
+        "attestor_may_record": true
       }
     },
     {
@@ -23,7 +24,8 @@
         "tiers": [],
         "price": "50000000000",
         "daily_limit": 0,
-        "pool_amount": "25000000000"
+        "pool_amount": "25000000000",
+        "attestor_may_record": true
       }
     },
     {
@@ -33,7 +35,8 @@
         "tiers": [],
         "price": "5000000000",
         "daily_limit": 0,
-        "pool_amount": "0"
+        "pool_amount": "0",
+        "attestor_may_record": true
       }
     },
     {
@@ -52,7 +55,8 @@
         ],
         "price": "0",
         "daily_limit": 3,
-        "pool_amount": "0"
+        "pool_amount": "0",
+        "attestor_may_record": false
       }
     },
     {
@@ -62,7 +66,8 @@
         "tiers": [],
         "price": "0",
         "daily_limit": 1,
-        "pool_amount": "0"
+        "pool_amount": "0",
+        "attestor_may_record": false
       }
     }
   ]
