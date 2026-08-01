@@ -258,8 +258,9 @@ fn exec_record_action(
             action: action.clone(),
         })?;
 
-    // The attestor must never be able to grant score for paid actions.
-    if !params.price.is_zero() {
+    // The attestor may only touch free actions, unless this one is explicitly
+    // marked otherwise in its config.
+    if !params.price.is_zero() && !params.attestor_may_record {
         return Err(ContractError::NotFree {});
     }
 

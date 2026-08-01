@@ -42,6 +42,7 @@ fn params(
         price: Uint128::new(price),
         pool_amount: Uint128::new(pool_amount),
         daily_limit,
+        attestor_may_record: false,
     }
 }
 
@@ -382,6 +383,51 @@ fn slash_cuts_rank_as_well_as_weight() {
         .unwrap();
     assert_eq!(after.effective, Uint128::new(30));
     assert_eq!(after.lifetime_earned, Uint128::new(30));
+}
+
+/// Opting a paid action in lets the attestor record it — the explicit trade
+/// for crediting paid actions while payment still flows outside the contract.
+#[test]
+fn attestor_may_record_paid_actions_only_when_opted_in() {
+    let (mut app, c) = setup();
+
+    let record = |app: &mut App| {
+        app.execute_contract(
+            Addr::unchecked(ATTESTOR),
+            c.clone(),
+            &ExecuteMsg::RecordAction {
+                user: USER.to_string(),
+                action: "question".to_string(),
+                ref_id: "q1".to_string(),
+            },
+            &[],
+        )
+    };
+
+    assert!(record(&mut app)
+        .unwrap_err()
+        .root_cause()
+        .to_string()
+        .contains("not free"));
+
+    let mut opted = params(40, vec![], QUESTION_PRICE, QUESTION_POOL, 0);
+    opted.attestor_may_record = true;
+    app.execute_contract(
+        Addr::unchecked(ADMIN),
+        c.clone(),
+        &ExecuteMsg::SetAction {
+            item: ActionItem { key: "question".to_string(), params: opted },
+        },
+        &[],
+    )
+    .unwrap();
+
+    record(&mut app).unwrap();
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(40));
+
+    // Still no funds moved: the payment happens outside the contract.
+    assert_eq!(balance(&app, POOL), Uint128::zero());
+    assert_eq!(balance(&app, TREASURY), Uint128::zero());
 }
 
 #[test]

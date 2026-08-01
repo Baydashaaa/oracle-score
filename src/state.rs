@@ -43,6 +43,13 @@ pub struct ActionParams {
     pub pool_amount: Uint128,
     /// Max occurrences per user per ref_id per day. Zero means unlimited.
     pub daily_limit: u8,
+    /// Lets the attestor record this action even though it carries a price.
+    ///
+    /// Off by default, and off is the safer setting: it means a compromised
+    /// attestor key cannot mint score for actions users pay for. Turning it on
+    /// is the explicit trade for recording paid actions off-chain while the
+    /// payment itself still flows outside the contract.
+    pub attestor_may_record: bool,
 }
 
 #[cw_serde]
@@ -153,6 +160,7 @@ mod tests {
             price: Uint128::zero(),
             pool_amount: Uint128::zero(),
             daily_limit: 0,
+            attestor_may_record: false,
         }
     }
 
@@ -245,6 +253,7 @@ mod tests {
             price: Uint128::zero(),
             pool_amount: Uint128::zero(),
             daily_limit: 0,
+            attestor_may_record: false,
         };
         assert_eq!(resolve_weight(&p, 0), Uint128::new(40));
         assert_eq!(resolve_weight(&p, 500), Uint128::new(40));
