@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/30621357/README.md)
 # Oracle Score
 
 On-chain reputation for [Terra Oracle Classic](https://terraoracle.io), running as a
@@ -175,6 +176,33 @@ cannot simply be re-applied.
 Always migrate rebel-2 first. It costs nothing and has already caught three bugs
 that would have reached mainnet: the rounding leak, the tier scope, and discounts
 breaking a percentage-based split.
+
+## Re-seeding
+
+`SeedScores` overwrites rather than adds, so re-seeding from a fresh snapshot is
+safe in itself — balances simply become what the snapshot says. What is not safe
+is doing it alone.
+
+The attestor skips any queued record older than `SNAPSHOT_TS`, because anything
+before that moment is already inside the seeded figure. Re-seed with a newer
+snapshot and leave that constant behind, and the next hourly run will record the
+actions between the two snapshots **on top of** the value that already includes
+them. Everyone in the queue gets paid twice.
+
+So the order is fixed:
+
+1. Let the queue drain (`GET /rep/pending` comes back empty)
+2. Take the snapshot, keep its `generatedAt`
+3. Raise `SNAPSHOT_TS` in `scripts/oracle-score-attest.js` to that timestamp and push
+4. Only then `SeedScores`
+5. Verify the four balances, publish the new snapshot hash
+
+Step 3 before step 4, always. The reverse order is silent — nothing errors, the
+numbers are just wrong a hour later.
+
+Re-seeding is only possible while seeding is open. `FinalizeSeeding` closes it
+permanently, which is why it waits until the frontend reads from the contract and
+people have confirmed their own ranks.
 
 ## Off-chain pieces
 
