@@ -19,7 +19,7 @@ Mainnet code id `11551`, checksum
 `a8cfa71900ecf426fcb7cddbbaafdabaa17aae4c0a73f190db2f52df486cdf96`.
 
 Reputation was seeded from a snapshot whose canonical hash is
-`4aed25763e120f627a3403604c66b20145002ea642487a57bc43d9fe42df4520` — 4 wallets,
+`4aed25763e120f627a3403604c66b20145002ea642487a57bc43d9fe42df4520` - 4 wallets,
 1,780 REP. The snapshot is reproducible from `GET /rep/all-time-snapshot` on the
 Worker plus the public `questions.json` history.
 
@@ -27,12 +27,12 @@ Worker plus the public `questions.json` history.
 
 A single reputation figure cannot serve both purposes, so the contract keeps two.
 
-**`lifetime_earned` — rank.** Never decays. Drives fee discounts and the weekly
+**`lifetime_earned` - rank.** Never decays. Drives fee discounts and the weekly
 reward multiplier. The published rules promise that rank never resets, and taking a
 break should not cost someone the status they earned. An inactive user asks no
 questions, so their discount costs nothing.
 
-**`effective` — weight.** Decays with a 90-day half-life. Drives draw entries,
+**`effective` - weight.** Decays with a 90-day half-life. Drives draw entries,
 treasury vote weight and gated features. Here the question is not what someone did
 once but what they are worth to the network now: without decay, a single burst of
 activity would buy permanent influence.
@@ -47,11 +47,11 @@ week.
 ## Scale
 
 Score is stored in micro-units, exactly like `uluna`: a weight of 40 is written as
-`40000000`. Divide by 1e6 for display, and **round rather than floor** — decay
+`40000000`. Divide by 1e6 for display, and **round rather than floor** - decay
 applied between blocks otherwise turns a freshly granted 40 into a displayed 39.
 
 This is not cosmetic. In whole units, `multiply_ratio` floored roughly a full point
-off every accrual, so five granted points showed up as four — a 20% leak that
+off every accrual, so five granted points showed up as four - a 20% leak that
 compounded on every write. Caught on testnet, fixed in v0.2.0.
 
 ## Actions
@@ -74,13 +74,13 @@ Each action is configured independently:
 **Tiers count per user per UTC day, across all references.** The ladder exists to
 stop one person farming answers, so the fourth answer of someone's day is worth
 less regardless of which question it lands on. Counting per question instead would
-punish whoever answers a popular thread late — an earlier version did exactly that,
+punish whoever answers a popular thread late - an earlier version did exactly that,
 which is why the semantics are spelled out here.
 
 **`pool_amount` is fixed, not a percentage.** Rank and streak discounts reduce only
 the treasury leg; the pool leg backs draw entries at a protocol-wide rate of 25,000
 LUNC per entry and must stay exact whoever pays. `price` is therefore set to the
-*maximum-discount floor* — 150,000 for Priority, 37,500 for Basic — and anyone
+*maximum-discount floor* - 150,000 for Priority, 37,500 for Basic - and anyone
 paying full price simply sends more to the treasury. Overpayment lands entirely on
 the treasury leg too.
 
@@ -108,7 +108,7 @@ transaction, and a test asserts the contract balance stays zero.
 `Config {}` · `Score { address }` · `EpochScore { address, epoch? }` ·
 `Leaderboard { epoch?, start_after?, limit? }` · `TierCount { action, address }`
 
-`Leaderboard` paginates by address, not by score — on-chain sorting by value needs
+`Leaderboard` paginates by address, not by score - on-chain sorting by value needs
 a secondary index. Callers fetch pages and sort client-side.
 
 ## Guarantees worth knowing
@@ -144,7 +144,7 @@ curl -s https://terra-classic-lcd.publicnode.com/cosmwasm/wasm/v1/code/11551
 ```
 
 Building locally with a modern toolchain instead of the optimizer produces a
-binary the CosmWasm 1.x VM may reject — Rust 1.82+ emits wasm extensions the VM
+binary the CosmWasm 1.x VM may reject - Rust 1.82+ emits wasm extensions the VM
 does not accept. Use the optimizer image; it pins the right compiler.
 
 ## Updating the contract
@@ -155,7 +155,7 @@ transaction changes what runs on chain.
 1. Edit, then `cargo test`
 2. Bump the version in `Cargo.toml`, run `cargo schema`
 3. Build with the optimizer
-4. `git push` — for history and verification
+4. `git push` - for history and verification
 5. `./migrate.sh` on rebel-2, verify the behaviour
 6. `./migrate-mainnet.sh`
 
@@ -169,7 +169,7 @@ action had to be re-applied with `SetAction` after the migration. Three ways out
 - re-apply the config after migrating, as above
 - write real conversion logic in `migrate()`
 
-`Config` and `ScoreEntry` deserve the most care — they hold live user data and
+`Config` and `ScoreEntry` deserve the most care - they hold live user data and
 cannot simply be re-applied.
 
 Always migrate rebel-2 first. It costs nothing and has already caught three bugs
@@ -191,7 +191,7 @@ job exists, free-action reputation is off-chain and should be described that way
 
 | Key | Role |
 |---|---|
-| `oracle-admin` | contract admin — migrations, parameters, slashing |
+| `oracle-admin` | contract admin - migrations, parameters, slashing |
 | `oracle-attestor` | records free actions; holds gas only |
 
 The admin mnemonic is the only irrecoverable secret in the project: lose it and the
