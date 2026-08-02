@@ -30,6 +30,9 @@ pub enum ContractError {
     #[error("Delta exceeds max_delta")]
     DeltaTooLarge {},
 
+    #[error("This action does not accept a caller-supplied amount")]
+    AmountNotAllowed {},
+
     #[error("Insufficient payment: {need} uluna required")]
     InsufficientPayment { need: Uint128 },
 

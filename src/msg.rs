@@ -35,11 +35,16 @@ pub enum ExecuteMsg {
     /// Paid action. The user pays, the contract grants score and splits the
     /// payment between pool and treasury in the same transaction.
     PaidAction { action: String, ref_id: String },
-    /// Free action attested off-chain. Rejected for any action with a price.
+    /// Free action attested off-chain. Rejected for any action with a price
+    /// unless that action opts in with `attestor_may_record`.
+    ///
+    /// `amount` overrides the configured weight, and is only accepted for
+    /// actions marked `variable_amount`. It is still capped by `max_delta`.
     RecordAction {
         user: String,
         action: String,
         ref_id: String,
+        amount: Option<Uint128>,
     },
     /// Import legacy balances. Only valid while seeding is open.
     SeedScores { entries: Vec<SeedEntry> },

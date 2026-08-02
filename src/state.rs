@@ -43,6 +43,16 @@ pub struct ActionParams {
     pub pool_amount: Uint128,
     /// Max occurrences per user per ref_id per day. Zero means unlimited.
     pub daily_limit: u8,
+    /// Lets the attestor supply the granted amount instead of using `weight`.
+    ///
+    /// Needed for actions whose value is not fixed — an NFT mint grants 25, 125
+    /// or 250 depending on tier, and encoding each tier as its own action would
+    /// mean a contract migration every time a tier is added.
+    ///
+    /// Off by default, and deliberately narrow: for every other action the
+    /// weight is whatever the config says, so a compromised attestor key cannot
+    /// choose how much it grants. Where it IS on, `max_delta` is the ceiling.
+    pub variable_amount: bool,
     /// Lets the attestor record this action even though it carries a price.
     ///
     /// Off by default, and off is the safer setting: it means a compromised
@@ -160,6 +170,7 @@ mod tests {
             price: Uint128::zero(),
             pool_amount: Uint128::zero(),
             daily_limit: 0,
+            variable_amount: false,
             attestor_may_record: false,
         }
     }
@@ -253,6 +264,7 @@ mod tests {
             price: Uint128::zero(),
             pool_amount: Uint128::zero(),
             daily_limit: 0,
+            variable_amount: false,
             attestor_may_record: false,
         };
         assert_eq!(resolve_weight(&p, 0), Uint128::new(40));

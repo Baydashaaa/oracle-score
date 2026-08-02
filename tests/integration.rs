@@ -42,6 +42,7 @@ fn params(
         price: Uint128::new(price),
         pool_amount: Uint128::new(pool_amount),
         daily_limit,
+        variable_amount: false,
         attestor_may_record: false,
     }
 }
@@ -150,6 +151,7 @@ fn answer(app: &mut App, c: &Addr, user: &str, ref_id: &str) -> anyhow::Result<(
             user: user.to_string(),
             action: "answer".to_string(),
             ref_id: ref_id.to_string(),
+            amount: None,
         },
         &[],
     )
@@ -399,6 +401,7 @@ fn attestor_may_record_paid_actions_only_when_opted_in() {
                 user: USER.to_string(),
                 action: "question".to_string(),
                 ref_id: "q1".to_string(),
+                amount: None,
             },
             &[],
         )
@@ -442,6 +445,7 @@ fn attestor_cannot_grant_score_for_paid_actions() {
                 user: USER.to_string(),
                 action: "question".to_string(),
                 ref_id: "q1".to_string(),
+                amount: None,
             },
             &[],
         )
@@ -463,6 +467,7 @@ fn random_wallet_cannot_record_actions() {
                 user: OTHER.to_string(),
                 action: "answer".to_string(),
                 ref_id: "q1".to_string(),
+                amount: None,
             },
             &[],
         )
@@ -751,6 +756,7 @@ fn answer_ref(app: &mut App, c: &Addr, ref_id: &str) {
             user: USER.to_string(),
             action: "answer".to_string(),
             ref_id: ref_id.to_string(),
+            amount: None,
         },
         &[],
     )
@@ -924,4 +930,101 @@ fn only_admin_can_prune() {
     let today = current_day(&app, &c);
     let err = prune(&mut app, &c, OTHER, today, None).unwrap_err();
     assert!(err.to_string().contains("Unauthorized"));
+}
+
+// ── caller-supplied amounts ────────────────────────────────────────────────
+// NFT mints grant 25, 125 or 250 depending on tier, so the amount cannot live
+// in the action config. It is accepted only where the config opted in, which is
+// what stops the attestor key from choosing its own grants everywhere else.
+
+fn variable_action(app: &mut App, c: &Addr, key: &str, max_weight: u128) {
+    let mut p = params(0, vec![], 0, 0, 0);
+    p.variable_amount = true;
+    let _ = max_weight;
+    app.execute_contract(
+        Addr::unchecked(ADMIN),
+        c.clone(),
+        &ExecuteMsg::SetAction {
+            item: ActionItem { key: key.to_string(), params: p },
+        },
+        &[],
+    )
+    .unwrap();
+}
+
+fn record_amount(
+    app: &mut App,
+    c: &Addr,
+    action: &str,
+    amount: Option<u128>,
+) -> anyhow::Result<()> {
+    app.execute_contract(
+        Addr::unchecked(ATTESTOR),
+        c.clone(),
+        &ExecuteMsg::RecordAction {
+            user: USER.to_string(),
+            action: action.to_string(),
+            ref_id: format!("r{:?}", amount),
+            amount: amount.map(Uint128::new),
+        },
+        &[],
+    )
+    .map(|_| ())
+    .map_err(|e| anyhow::anyhow!(e.root_cause().to_string()))
+}
+
+#[test]
+fn variable_actions_take_the_supplied_amount() {
+    let (mut app, c) = setup();
+    variable_action(&mut app, &c, "mint", 0);
+
+    record_amount(&mut app, &c, "mint", Some(25)).unwrap();
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(25));
+
+    // A different tier, same action — no config change needed.
+    record_amount(&mut app, &c, "mint", Some(75)).unwrap();
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(100));
+}
+
+#[test]
+fn fixed_actions_refuse_a_supplied_amount() {
+    let (mut app, c) = setup();
+
+    // `answer` is a normal tiered action and must ignore nobody's opinion of
+    // what it is worth.
+    let err = record_amount(&mut app, &c, "answer", Some(99)).unwrap_err();
+    assert!(err.to_string().contains("does not accept"));
+    assert_eq!(score_of(&app, &c, USER), Uint128::zero());
+}
+
+#[test]
+fn supplied_amounts_are_still_capped_by_max_delta() {
+    let (mut app, c) = setup();
+    variable_action(&mut app, &c, "mint", 0);
+
+    // setup() configures max_delta at 100.
+    let err = record_amount(&mut app, &c, "mint", Some(101)).unwrap_err();
+    assert!(err.to_string().contains("max_delta"));
+
+    record_amount(&mut app, &c, "mint", Some(100)).unwrap();
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(100));
+}
+
+#[test]
+fn a_variable_action_without_an_amount_falls_back_to_its_weight() {
+    let (mut app, c) = setup();
+    let mut p = params(30, vec![], 0, 0, 0);
+    p.variable_amount = true;
+    app.execute_contract(
+        Addr::unchecked(ADMIN),
+        c.clone(),
+        &ExecuteMsg::SetAction {
+            item: ActionItem { key: "mint".to_string(), params: p },
+        },
+        &[],
+    )
+    .unwrap();
+
+    record_amount(&mut app, &c, "mint", None).unwrap();
+    assert_eq!(score_of(&app, &c, USER), Uint128::new(30));
 }

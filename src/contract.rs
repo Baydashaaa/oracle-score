@@ -75,7 +75,8 @@ pub fn execute(
             user,
             action,
             ref_id,
-        } => exec_record_action(deps, env, info, user, action, ref_id),
+            amount,
+        } => exec_record_action(deps, env, info, user, action, ref_id, amount),
         ExecuteMsg::SeedScores { entries } => exec_seed(deps, env, info, entries),
         ExecuteMsg::FinalizeSeeding {} => exec_finalize_seeding(deps, info),
         ExecuteMsg::Slash {
@@ -236,6 +237,7 @@ fn exec_paid_action(
         .add_attribute("raw", new_raw.to_string()))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn exec_record_action(
     deps: DepsMut,
     env: Env,
@@ -243,6 +245,7 @@ fn exec_record_action(
     user: String,
     action: String,
     ref_id: String,
+    amount: Option<Uint128>,
 ) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
     if cfg.paused {
@@ -268,7 +271,18 @@ fn exec_record_action(
     let now = env.block.time.seconds();
     check_rate_limit(deps.storage, now, &user_addr, &ref_id, params.daily_limit)?;
     let prior = bump_tier_count(deps.storage, now, &action, &user_addr)?;
-    let weight = resolve_weight(&params, prior);
+    // A supplied amount replaces the tiered weight, but only where the action
+    // was configured to allow it. Everywhere else the config decides, not the
+    // caller — that is what keeps the attestor key from choosing its own grants.
+    let weight = match amount {
+        Some(a) => {
+            if !params.variable_amount {
+                return Err(ContractError::AmountNotAllowed {});
+            }
+            a
+        }
+        None => resolve_weight(&params, prior),
+    };
 
     if weight > cfg.max_delta {
         return Err(ContractError::DeltaTooLarge {});
