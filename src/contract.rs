@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     coins, to_json_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
-    StdResult, Storage, Uint128,
+    StdError, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
 use cw_storage_plus::Bound;
@@ -527,7 +527,36 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::TierCount { action, address } => {
             to_json_binary(&q_tier_count(deps, env, action, address)?)
         }
+        QueryMsg::Action { key } => to_json_binary(&q_action(deps, key)?),
+        QueryMsg::Actions { start_after, limit } => {
+            to_json_binary(&q_actions(deps, start_after, limit)?)
+        }
     }
+}
+
+fn q_action(deps: Deps, key: String) -> StdResult<ActionResponse> {
+    let params = ACTIONS
+        .may_load(deps.storage, &key)?
+        .ok_or_else(|| StdError::not_found(format!("action {key}")))?;
+    Ok(ActionResponse { key, params })
+}
+
+fn q_actions(
+    deps: Deps,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<ActionsResponse> {
+    let limit = limit.unwrap_or(30).min(100) as usize;
+    let start = start_after.as_deref().map(Bound::exclusive);
+    let actions = ACTIONS
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            let (key, params) = item?;
+            Ok(ActionResponse { key, params })
+        })
+        .collect::<StdResult<Vec<_>>>()?;
+    Ok(ActionsResponse { actions })
 }
 
 fn q_config(deps: Deps, env: Env) -> StdResult<ConfigResponse> {

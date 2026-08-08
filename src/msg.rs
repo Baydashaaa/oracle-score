@@ -98,6 +98,19 @@ pub enum QueryMsg {
     /// Lets the frontend show what the next one is worth before acting.
     #[returns(TierCountResponse)]
     TierCount { action: String, address: String },
+
+    /// Parameters of one action. Lets a caller read the price instead of
+    /// keeping its own copy of the tariff.
+    #[returns(ActionResponse)]
+    Action { key: String },
+
+    /// Every configured action. The frontend needs all tariffs at once, and
+    /// one round trip beats three.
+    #[returns(ActionsResponse)]
+    Actions {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
 }
 
 #[cw_serde]
@@ -128,6 +141,17 @@ pub struct ScoreResponse {
 pub struct EpochScoreResponse {
     pub epoch: u64,
     pub score: Uint128,
+}
+
+#[cw_serde]
+pub struct ActionResponse {
+    pub key: String,
+    pub params: ActionParams,
+}
+
+#[cw_serde]
+pub struct ActionsResponse {
+    pub actions: Vec<ActionResponse>,
 }
 
 #[cw_serde]
