@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HOME_DIR=~/.terra-mainnet
-KEY=oracle-admin
+KEY=oracle-score-admin
 C=$(cat .contract-mainnet)
 LCD=https://terra-classic-lcd.publicnode.com
 GAS="--gas auto --gas-adjustment 1.6 --gas-prices 28.325uluna -y"
