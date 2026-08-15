@@ -88,7 +88,6 @@ pub fn execute(
             exec_prune_rate_limit(deps, info, before_day, limit)
         }
         ExecuteMsg::SetAction { item } => exec_set_action(deps, info, item),
-        ExecuteMsg::RemoveAction { action } => exec_remove_action(deps, info, action),
         ExecuteMsg::UpdateConfig {
             attestor,
             treasury,
@@ -440,26 +439,6 @@ fn exec_set_action(
     Ok(Response::new()
         .add_attribute("action", "set_action")
         .add_attribute("key", item.key))
-}
-
-fn exec_remove_action(
-    deps: DepsMut,
-    info: MessageInfo,
-    action: String,
-) -> Result<Response, ContractError> {
-    let cfg = CONFIG.load(deps.storage)?;
-    if info.sender != cfg.admin {
-        return Err(ContractError::Unauthorized {});
-    }
-    // Проверяем существование до удаления: молчаливый успех на опечатке в
-    // ключе оставил бы админа в уверенности, что действие убрано.
-    if !ACTIONS.has(deps.storage, action.as_str()) {
-        return Err(ContractError::UnknownAction { action });
-    }
-    ACTIONS.remove(deps.storage, action.as_str());
-    Ok(Response::new()
-        .add_attribute("action", "remove_action")
-        .add_attribute("key", action))
 }
 
 #[allow(clippy::too_many_arguments)]

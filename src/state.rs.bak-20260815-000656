@@ -52,11 +52,6 @@ pub struct ActionParams {
     /// Off by default, and deliberately narrow: for every other action the
     /// weight is whatever the config says, so a compromised attestor key cannot
     /// choose how much it grants. Where it IS on, `max_delta` is the ceiling.
-    ///
-    /// `serde(default)` обязателен: запись `tax_probe` на мейннете сохранена
-    /// ДО появления этого поля, и без значения по умолчанию её чтение падает,
-    /// а с ним и всякий обход ACTIONS целиком. `false` — безопасное значение.
-    #[serde(default)]
     pub variable_amount: bool,
     /// Lets the attestor record this action even though it carries a price.
     ///
@@ -64,11 +59,6 @@ pub struct ActionParams {
     /// attestor key cannot mint score for actions users pay for. Turning it on
     /// is the explicit trade for recording paid actions off-chain while the
     /// payment itself still flows outside the contract.
-    ///
-    /// `serde(default)` по той же причине, что и у `variable_amount`: старые
-    /// записи в хранилище этого поля не содержат. `false` означает «аттестор
-    /// не может записывать платные действия» — строгая сторона.
-    #[serde(default)]
     pub attestor_may_record: bool,
 }
 

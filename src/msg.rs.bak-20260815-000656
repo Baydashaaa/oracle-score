@@ -62,13 +62,6 @@ pub enum ExecuteMsg {
         limit: Option<u32>,
     },
     SetAction { item: ActionItem },
-    /// Удалить действие из конфигурации.
-    ///
-    /// Раньше удалять было нечем: `SetAction` умеет только записывать, и
-    /// обезвредить ненужное действие можно было единственным способом —
-    /// перезаписать пустышкой с нулевым весом и ценой. Так на мейннете и
-    /// остался висеть `tax_probe`.
-    RemoveAction { action: String },
     /// Adjust operational parameters without a migration. Epoch length is
     /// deliberately absent: changing it would reindex historical buckets.
     UpdateConfig {
