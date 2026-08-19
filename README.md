@@ -20,9 +20,18 @@ Mainnet code id `11571`, checksum
 `af9ad9eb7ad46700d29c56da97b42da27b4085c270113cfd3a5bf21b6f72af58`.
 
 Reputation was seeded from a snapshot whose canonical hash is
-`4aed25763e120f627a3403604c66b20145002ea642487a57bc43d9fe42df4520` - 4 wallets,
-1,780 REP. The snapshot is reproducible from `GET /rep/all-time-snapshot` on the
-Worker plus the public `questions.json` history.
+`e02fd7a59c38060ca6924856c9f01b9af7acefd59e94e96b3e721cbd01392f2c` - 4 wallets,
+1,890 REP, written on 2026-08-01 by
+[`796D21C349D02A3F5A9A22ECB831B03F5A54FD33E46D4FB0F533EE393A327741`](https://finder.terraport.finance/mainnet/tx/796D21C349D02A3F5A9A22ECB831B03F5A54FD33E46D4FB0F533EE393A327741).
+
+An earlier seeding on 2026-07-31 wrote 1,780 REP; `SeedScores` replaces an entry
+rather than adding to it, so the second call superseded the first. Seeding was
+then closed permanently by `FinalizeSeeding` on 2026-08-03.
+
+Verify it against the chain, not against the Worker: the seeding transaction
+above is public and immutable. The `GET /rep/all-time-snapshot` endpoint
+recomputes reputation **as of the moment you call it**, so it cannot reproduce a
+past snapshot - today it returns a different wallet count and total.
 
 ## Two numbers, not one
 
